@@ -1,0 +1,41 @@
+# --- 웹 API ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# --- DB / Cache ---
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
+redis==5.2.1
+
+# --- 스케줄링 ---
+apscheduler==3.11.0
+
+# --- 데이터 수집 ---
+httpx==0.28.1
+beautifulsoup4==4.12.3
+lxml==5.3.0
+websockets==14.1
+
+# --- 분석 ---
+pandas==2.2.3
+numpy==2.2.1
+pandas-ta==0.3.14b0
+scikit-learn==1.6.0
+
+# --- 감성분석 (로컬 CPU 추론) ---
+transformers==4.47.1
+torch==2.5.1
+sentencepiece==0.2.0
+
+# --- 설정 / 유틸 ---
+python-dotenv==1.0.1
+pyyaml==6.0.2
+tenacity==9.0.0
+structlog==24.4.0
+
+# --- 개발 ---
+pytest==8.3.4
+pytest-asyncio==0.25.0
+ruff==0.8.4
