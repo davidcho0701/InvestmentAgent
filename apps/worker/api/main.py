@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ..core import get_logger, settings
 from ..core import cache, db
 from .routes_chart import router as chart_router
+from .routes_company import router as company_router
 from .routes_score import router as score_router
 from .routes_watchlist import router as watchlist_router
 
@@ -41,6 +42,7 @@ app.add_middleware(
 app.include_router(score_router)
 app.include_router(watchlist_router)
 app.include_router(chart_router)
+app.include_router(company_router)
 
 
 @app.get("/health")
