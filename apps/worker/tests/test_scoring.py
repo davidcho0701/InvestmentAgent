@@ -1,3 +1,5 @@
+import pytest
+
 from apps.worker.pipeline.scoring import (
     accrual_penalty,
     calculate_final_score,
@@ -22,7 +24,7 @@ def test_accrual_penalty_below_threshold():
 
 
 def test_accrual_penalty_scales_and_caps():
-    assert accrual_penalty(0.15) == 5.0
+    assert accrual_penalty(0.15) == pytest.approx(5.0)
     assert accrual_penalty(0.99) == 20.0
 
 

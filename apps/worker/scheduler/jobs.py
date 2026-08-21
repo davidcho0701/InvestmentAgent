@@ -27,7 +27,43 @@ def job_sync_corp_codes() -> None:
 
 def job_sync_financials() -> None:
     """관심종목 + 파일럿 기업 재무제표 일 배치 (Phase 1)."""
-    raise NotImplementedError("Phase 1")
+    from ..core import db
+    from ..pipeline import entity_resolution, financial_normalize
+
+    pilot_stock_codes = list(entity_resolution.PILOT_ALIASES.keys())
+    rows = db.fetch_all(
+        """
+        SELECT DISTINCT c.corp_code
+        FROM dim_company c
+        LEFT JOIN user_watchlist w ON w.corp_code = c.corp_code
+        WHERE w.corp_code IS NOT NULL OR c.stock_code = ANY(:pilot_codes)
+        """,
+        {"pilot_codes": pilot_stock_codes},
+    )
+    corp_codes = [r["corp_code"] for r in rows]
+    report_date = financial_normalize.latest_available_report_date()
+
+    ok, empty, failed = 0, 0, 0
+    for corp_code in corp_codes:
+        try:
+            features = financial_normalize.build_financial_features(corp_code, report_date)
+            if not features:
+                empty += 1
+                continue
+            financial_normalize.save_financial_statement(corp_code, report_date, features)
+            ok += 1
+        except Exception:
+            log.exception("재무제표 동기화 실패", corp_code=corp_code)
+            failed += 1
+
+    log.info(
+        "재무제표 일 배치 완료",
+        report_date=report_date,
+        ok=ok,
+        empty=empty,
+        failed=failed,
+        total=len(corp_codes),
+    )
 
 
 def job_poll_news() -> None:
