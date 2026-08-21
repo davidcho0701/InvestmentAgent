@@ -106,10 +106,19 @@ ACCOUNT_MAP: dict[str, str] = {
 }
 
 
+# DART fnlttSinglAcntAll 은 BS/IS(또는 CIS)/CF 외에 자본변동표(SCE)도 같이 내려주는데,
+# SCE 는 자본금/이익잉여금/비지배지분 등 구성요소별 행이 'ifrs-full_Equity' 같은
+# account_id 를 반복 재사용한다(각 열의 소계). 그대로 두면 재무상태표의 진짜 값을
+# 엉뚱한 SCE 구성요소 값으로 덮어써버리므로 정규화 대상에서 제외한다.
+_EXCLUDED_SJ_DIV = {"SCE"}
+
+
 def normalize_statement(raw_accounts: list[dict[str, Any]]) -> dict[str, float]:
     """DART fnlttSinglAcntAll 응답 목록을 내부 표준 필드 dict 로 축약한다."""
     result: dict[str, float] = {}
     for row in raw_accounts:
+        if row.get("sj_div") in _EXCLUDED_SJ_DIV:
+            continue
         field = ACCOUNT_MAP.get(row.get("account_id"))
         if not field:
             continue

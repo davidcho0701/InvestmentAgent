@@ -53,6 +53,18 @@ def test_normalize_statement_maps_known_accounts():
     assert result == {"total_assets": 1234567.0, "revenue": 500000.0}
 
 
+def test_normalize_statement_excludes_sce_duplicate_account_ids():
+    # DART 는 자본변동표(SCE)에서 'ifrs-full_Equity' 를 자본금/이익잉여금 등
+    # 구성요소별로 반복 재사용한다 — BS 의 진짜 자본총계를 덮어쓰면 안 된다.
+    raw = [
+        {"sj_div": "BS", "account_id": "ifrs-full_Equity", "thstrm_amount": "579,309,676"},
+        {"sj_div": "SCE", "account_id": "ifrs-full_Equity", "thstrm_amount": "897,514"},
+        {"sj_div": "SCE", "account_id": "ifrs-full_Equity", "thstrm_amount": "4,403,893"},
+    ]
+    result = normalize_statement(raw)
+    assert result == {"total_equity": 579309676.0}
+
+
 def test_normalize_statement_handles_negative_and_bad_values():
     raw = [
         {"account_id": "ifrs-full_ProfitLoss", "thstrm_amount": "-12,345"},
