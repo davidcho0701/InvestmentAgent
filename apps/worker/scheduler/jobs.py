@@ -68,7 +68,16 @@ def job_sync_financials() -> None:
 
 def job_poll_news() -> None:
     """관심종목 뉴스 폴링 (NEWS_POLL_INTERVAL_MINUTES 주기, Phase 2)."""
-    raise NotImplementedError("Phase 2")
+    from ..core import db
+    from ..pipeline import news_sentiment
+
+    rows = db.fetch_all("SELECT DISTINCT corp_code FROM user_watchlist")
+    for row in rows:
+        try:
+            result = news_sentiment.process_news_batch(row["corp_code"])
+            log.info("뉴스 폴링 완료", **result)
+        except Exception:
+            log.exception("뉴스 폴링 실패", corp_code=row["corp_code"])
 
 
 def job_sync_macro() -> None:
@@ -81,12 +90,41 @@ def job_sync_macro() -> None:
 
 def job_sync_consensus() -> None:
     """애널리스트 컨센서스 일 배치 (Phase 3)."""
-    raise NotImplementedError("Phase 3")
+    from ..core import db
+    from ..pipeline import analyst_consensus
+
+    rows = db.fetch_all(
+        """
+        SELECT DISTINCT c.stock_code
+        FROM dim_company c
+        JOIN user_watchlist w ON w.corp_code = c.corp_code
+        WHERE c.stock_code IS NOT NULL
+        """
+    )
+    total = 0
+    for row in rows:
+        try:
+            total += analyst_consensus.sync_consensus(row["stock_code"])
+        except Exception:
+            log.exception("컨센서스 동기화 실패", stock_code=row["stock_code"])
+    log.info("애널리스트 컨센서스 배치 완료", count=total)
 
 
 def job_rescore_batch() -> None:
     """관심종목 정기 스코어 재계산 (trigger_type='batch', Phase 4)."""
-    raise NotImplementedError("Phase 4")
+    from ..core import db
+    from ..pipeline import scoring
+
+    rows = db.fetch_all("SELECT DISTINCT corp_code FROM user_watchlist")
+    ok, failed = 0, 0
+    for row in rows:
+        try:
+            scoring.rescore_live(row["corp_code"], trigger_type="batch")
+            ok += 1
+        except Exception:
+            log.exception("정기 재스코어링 실패", corp_code=row["corp_code"])
+            failed += 1
+    log.info("정기 재스코어링 배치 완료", ok=ok, failed=failed)
 
 
 def build_scheduler() -> BlockingScheduler:
