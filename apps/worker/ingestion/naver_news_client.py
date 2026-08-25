@@ -18,7 +18,10 @@ from ..core import cache, get_logger, settings
 
 log = get_logger(__name__)
 
-SEARCH_URL = "https://openapi.naver.com/v1/search/news.json"
+# 네이버 검색 Open API 는 NAVER API HUB(NCP)로 이관되어, 구 developers.naver.com 방식
+# (X-Naver-Client-Id/Secret, openapi.naver.com) 이 아니라 NCP API Gateway 인증
+# (X-NCP-APIGW-API-KEY-ID/KEY, naverapihub.apigw.ntruss.com) 을 쓴다. 응답 JSON(items 등)은 동일.
+SEARCH_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news"
 _USER_AGENT = "InvestScopeBot/0.1 (+https://github.com/; contact: dev@investscope.local)"
 
 # 본문 추출용 CSS 셀렉터 (국내 주요 언론사/포털 공통 패턴 우선순위)
@@ -43,8 +46,8 @@ def _parse_pubdate(pub_date: str | None) -> str | None:
 def search_news(query: str, display: int = 50, start: int = 1) -> list[dict[str, Any]]:
     """기업명/별칭으로 뉴스 검색. 반환: [{title, url, description, published_at}]."""
     headers = {
-        "X-Naver-Client-Id": settings.naver_client_id,
-        "X-Naver-Client-Secret": settings.naver_client_secret,
+        "X-NCP-APIGW-API-KEY-ID": settings.naver_client_id,
+        "X-NCP-APIGW-API-KEY": settings.naver_client_secret,
     }
     params = {"query": query, "display": display, "start": start, "sort": "date"}
     with httpx.Client(timeout=15.0) as client:

@@ -39,9 +39,11 @@ def analyze_sentiment(text: str) -> float:
     """-1(부정) ~ +1(긍정) 연속값으로 변환."""
     if not text:
         return 0.0
-    # 문자 수 슬라이스(text[:2000])는 순전히 성능용 사전 컷이고, 실제 모델 토큰 한도(512)는
-    # 한글 서브워드 토큰화 특성상 글자 수와 어긋날 수 있어 truncation=True 로 별도 보장한다.
-    result = get_sentiment_pipeline()(text[:2000], truncation=True)[0]
+    # 문자 수 슬라이스(text[:2000])는 순전히 성능용 사전 컷이고, 실제 모델 토큰 한도는 한글
+    # 서브워드 토큰화 특성상 글자 수와 어긋날 수 있다. KR-FinBert-SC 토크나이저는
+    # model_max_length 를 스스로 못 잡아 truncation=True 만으로는 부족해서(실측: 1067 토큰
+    # 입력에 RuntimeError) max_length=512 를 명시해 BERT 의 position embedding 한도에 맞춘다.
+    result = get_sentiment_pipeline()(text[:2000], truncation=True, max_length=512)[0]
     sign = _LABEL_SIGN.get(str(result.get("label", "")).lower(), 0)
     return sign * float(result.get("score", 0.0))
 
