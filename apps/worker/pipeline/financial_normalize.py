@@ -288,9 +288,10 @@ def save_financial_statement(corp_code: str, report_date: str, features: dict[st
         for key, value in features.items()
         if key.endswith("_percentile")
     }
-    skip_keys = _NON_ACCOUNT_KEYS | set(percentile_by_metric) | {
-        f"{m}_percentile" for m in percentile_by_metric
-    }
+    # percentile_by_metric 의 값(예: percentile_by_metric["operating_margin"])은 아래 rows 에서
+    # account_id == 그 지표명(operating_margin)인 행의 sector_percentile_rank 로 붙는다.
+    # 따라서 지표명 자체는 skip 하면 안 되고, "_percentile" 접미사가 붙은 합성 키만 skip 한다.
+    skip_keys = _NON_ACCOUNT_KEYS | {f"{m}_percentile" for m in percentile_by_metric}
 
     rows = [
         {

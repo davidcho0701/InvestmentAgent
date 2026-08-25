@@ -234,7 +234,7 @@ def rescore_live(corp_code: str, trigger_type: str = "batch") -> dict[str, Any]:
             (corp_code, score_date, final_score, contributing_factors,
              recommendation_label, trigger_type)
         VALUES
-            (:corp_code, :score_date, :final_score, :contributing_factors::jsonb,
+            (:corp_code, :score_date, :final_score, CAST(:contributing_factors AS jsonb),
              :recommendation_label, :trigger_type)
         """,
         {
@@ -298,7 +298,8 @@ def compute_snapshot_and_cache(stock_code: str) -> dict[str, Any]:
         INSERT INTO fact_snapshot_score
             (corp_code, requested_at, final_score, contributing_factors, expires_at)
         VALUES
-            (:corp_code, :requested_at, :final_score, :contributing_factors::jsonb, :expires_at)
+            (:corp_code, :requested_at, :final_score,
+             CAST(:contributing_factors AS jsonb), :expires_at)
         ON CONFLICT (corp_code) DO UPDATE
         SET requested_at = EXCLUDED.requested_at,
             final_score = EXCLUDED.final_score,

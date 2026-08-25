@@ -1,5 +1,6 @@
 from datetime import date
 
+from apps.worker.pipeline import financial_normalize as fn
 from apps.worker.pipeline.financial_normalize import (
     calc_accrual_ratio,
     calc_dio,
@@ -91,3 +92,37 @@ def test_latest_available_report_date_picks_most_recent_filed_quarter():
 def test_latest_available_report_date_skips_unfiled_annual_report():
     # 2026-02-01 기준: 2025-12-31 사업보고서는 32일밖에 안 지나 lag(90일) 미충족 -> 직전 분기가 최신
     assert latest_available_report_date(date(2026, 2, 1)) == "2025-09-30"
+
+
+def test_save_financial_statement_keeps_derived_ratio_accounts(monkeypatch):
+    # 회귀 방지: skip_keys 가 "_percentile" 접미사가 붙은 합성 키뿐 아니라
+    # operating_margin/roe 같은 지표명 자체까지 걸러내면, scoring.assemble_features() 가
+    # 조회하는 계정 행이 통째로 사라진다 (실서버 실행 중 발견된 버그).
+    captured: dict[str, list[dict]] = {}
+
+    def fake_execute(sql, rows):
+        captured["rows"] = rows
+        return len(rows)
+
+    monkeypatch.setattr(fn.db, "execute", fake_execute)
+
+    features = {
+        "revenue": 1000.0,
+        "operating_margin": 12.5,
+        "operating_margin_percentile": 80.0,
+        "roe": 10.0,
+        "roe_percentile": None,
+        "fs_div": "CFS",
+        "source_rcp_no": "123",
+        "accrual_ratio": 0.02,
+        "dso": 30.0,
+        "dio": 20.0,
+    }
+    fn.save_financial_statement("00000001", "2025-12-31", features)
+
+    saved_ids = {r["account_id"] for r in captured["rows"]}
+    assert {"revenue", "operating_margin", "roe"} <= saved_ids
+    assert "operating_margin_percentile" not in saved_ids
+
+    om_row = next(r for r in captured["rows"] if r["account_id"] == "operating_margin")
+    assert om_row["sector_percentile_rank"] == 80.0
