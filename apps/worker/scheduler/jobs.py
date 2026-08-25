@@ -28,6 +28,7 @@ def job_sync_corp_codes() -> None:
 def job_sync_financials() -> None:
     """관심종목 + 파일럿 기업 재무제표 일 배치 (Phase 1)."""
     from ..core import db
+    from ..ingestion import dart_client
     from ..pipeline import entity_resolution, financial_normalize
 
     pilot_stock_codes = list(entity_resolution.PILOT_ALIASES.keys())
@@ -46,6 +47,7 @@ def job_sync_financials() -> None:
     ok, empty, failed = 0, 0, 0
     for corp_code in corp_codes:
         try:
+            dart_client.sync_sector(corp_code)
             features = financial_normalize.build_financial_features(corp_code, report_date)
             if not features:
                 empty += 1

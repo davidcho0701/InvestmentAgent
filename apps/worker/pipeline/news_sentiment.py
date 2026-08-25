@@ -39,7 +39,9 @@ def analyze_sentiment(text: str) -> float:
     """-1(부정) ~ +1(긍정) 연속값으로 변환."""
     if not text:
         return 0.0
-    result = get_sentiment_pipeline()(text[:512])[0]
+    # 문자 수 슬라이스(text[:2000])는 순전히 성능용 사전 컷이고, 실제 모델 토큰 한도(512)는
+    # 한글 서브워드 토큰화 특성상 글자 수와 어긋날 수 있어 truncation=True 로 별도 보장한다.
+    result = get_sentiment_pipeline()(text[:2000], truncation=True)[0]
     sign = _LABEL_SIGN.get(str(result.get("label", "")).lower(), 0)
     return sign * float(result.get("score", 0.0))
 

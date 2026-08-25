@@ -96,6 +96,105 @@ def upsert_companies(companies: list[dict[str, Any]]) -> int:
     return len(listed)
 
 
+# --- 업종(섹터) 조회·매핑 ---
+#
+# corpCode.xml 은 업종 정보를 주지 않는다. company.json 의 induty_code(KSIC 표준산업분류
+# 코드)를 dim_sector_sensitivity 에 이미 시딩해둔 업종 라벨로 매핑한다. 정밀한 5단위 매핑
+# 표를 만들기보다, 상위 2~3자리 접두사 기준의 실용적 매핑으로 시작한다(길수록 우선 매치).
+_INDUTY_SECTOR_BY_PREFIX_LEN: dict[int, dict[str, str]] = {
+    3: {
+        "264": "반도체",  # 반도체 소자/부품 제조업 (26 전자부품업의 세분류)
+    },
+    2: {
+        "10": "음식료",
+        "11": "음식료",
+        "19": "화학",
+        "20": "화학",
+        "21": "제약/바이오",
+        "22": "화학",
+        "24": "철강",
+        "25": "기계",
+        "26": "전기전자",
+        "27": "전기전자",
+        "28": "전기전자",
+        "29": "기계",
+        "30": "자동차",
+        "31": "조선",
+        "35": "유틸리티",
+        "41": "건설",
+        "42": "건설",
+        "45": "유통",
+        "46": "유통",
+        "47": "유통",
+        "49": "운송",
+        "50": "운송",
+        "51": "운송",
+        "52": "운송",
+        "58": "게임",
+        "61": "통신",
+        "62": "IT서비스",
+        "63": "IT서비스",
+        "64": "은행",
+        "65": "보험",
+        "66": "증권",
+    },
+}
+
+
+def map_induty_to_sector(induty_code: str | None) -> str | None:
+    """KSIC induty_code -> dim_sector_sensitivity 업종 라벨. 매칭 없으면 None(결측 유지)."""
+    if not induty_code:
+        return None
+    code = induty_code.strip()
+    for prefix_len in sorted(_INDUTY_SECTOR_BY_PREFIX_LEN, reverse=True):
+        sector = _INDUTY_SECTOR_BY_PREFIX_LEN[prefix_len].get(code[:prefix_len])
+        if sector:
+            return sector
+    return None
+
+
+@_retry_network
+def fetch_company_info(corp_code: str) -> dict[str, Any] | None:
+    """company.json — 기업 개황(업종코드 induty_code 포함) 조회."""
+    params = {"crtfc_key": settings.dart_api_key, "corp_code": corp_code}
+    with _client() as client:
+        resp = client.get("/company.json", params=params)
+        resp.raise_for_status()
+        payload = resp.json()
+
+    status = payload.get("status")
+    if status == STATUS_NO_DATA:
+        return None
+    if status != STATUS_OK:
+        raise DartApiError(f"company.json 조회 실패 (status={status}): {payload.get('message')}")
+    return payload
+
+
+def sync_sector(corp_code: str) -> str | None:
+    """dim_company.sector 를 채운다. 업종은 사실상 불변이므로 이미 있으면 재조회하지 않는다."""
+    existing = db.fetch_one(
+        "SELECT sector FROM dim_company WHERE corp_code = :corp_code", {"corp_code": corp_code}
+    )
+    if existing and existing.get("sector"):
+        return existing["sector"]
+
+    try:
+        info = fetch_company_info(corp_code)
+    except Exception:
+        log.exception("기업개황(업종) 조회 실패", corp_code=corp_code)
+        return None
+    if not info:
+        return None
+
+    sector = map_induty_to_sector(info.get("induty_code"))
+    if sector:
+        db.execute(
+            "UPDATE dim_company SET sector = :sector WHERE corp_code = :corp_code",
+            {"sector": sector, "corp_code": corp_code},
+        )
+    return sector
+
+
 @_retry_network
 def fetch_financial_statement(
     corp_code: str, bsns_year: str, reprt_code: str = "11011", fs_div: str = "CFS"
