@@ -15,8 +15,8 @@ BASE_URL = "https://ecos.bok.or.kr/api"
 # 수집 대상 지표: (통계표코드, 항목코드, 주기, 내부 지표명)
 INDICATORS: list[tuple[str, str, str, str]] = [
     ("722Y001", "0101000", "M", "base_rate"),        # 한국은행 기준금리
-    ("817Y002", "010200000", "M", "ktb_3y"),         # 국고채 3년
-    ("731Y001", "0000001", "M", "usd_krw"),          # 원/달러 환율
+    ("817Y002", "010200000", "D", "ktb_3y"),         # 국고채 3년 (일별 주기만 제공)
+    ("731Y001", "0000001", "D", "usd_krw"),          # 원/달러 환율 (이 통계표는 일별 주기만 제공)
     ("901Y009", "0", "M", "cpi"),                    # 소비자물가지수
 ]
 
@@ -36,10 +36,13 @@ class EcosApiError(RuntimeError):
 
 
 def _lookback_period(cycle: str, lookback: int = 24) -> tuple[str, str]:
-    """cycle(M=월,Q=분기,A=연) 기준 오늘부터 lookback 기간 전까지 (start, end) 문자열을 만든다."""
-    from datetime import date
+    """cycle(D=일,M=월,Q=분기,A=연) 기준 오늘부터 lookback 만큼 이전까지 (start,end)."""
+    from datetime import date, timedelta
 
     today = date.today()
+    if cycle == "D":
+        start_date = today - timedelta(days=lookback)
+        return start_date.strftime("%Y%m%d"), today.strftime("%Y%m%d")
     if cycle == "M":
         end = f"{today.year}{today.month:02d}"
         total_months = today.year * 12 + (today.month - 1) - lookback
