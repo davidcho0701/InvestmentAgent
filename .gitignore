@@ -14,7 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# 루트에 고정: 앞에 슬래시가 없으면 apps/web/lib/ 같은 프론트엔드 소스 디렉터리까지
+# 실수로 무시된다 (Phase 0 스캐폴딩부터 apps/web/lib/ 전체가 git에 잡히지 않던 원인).
+/lib/
 lib64/
 parts/
 sdist/
@@ -216,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Node / Next.js (apps/web) ---
+node_modules/
+.next/
+out/
+.vercel
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

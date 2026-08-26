@@ -47,6 +47,12 @@ class KISAuthenticationError(KISAPIError):
     """KIS could not issue a REST token or a WebSocket approval key."""
 
 
+# Backward-compatible name used by the existing analytics pipeline.  The
+# pipeline's analyst-consensus endpoint remains deliberately unimplemented
+# until its KIS TR ID and response schema have been live-verified.
+KisApiError = KISAPIError
+
+
 @dataclass(frozen=True, slots=True)
 class KISSettings:
     """KIS configuration loaded from environment variables."""
@@ -284,6 +290,28 @@ def _string_value(value: object) -> str | None:
 def _is_expired_token_error(error: KISAPIError) -> bool:
     # EGW00123 is the token-expiry code shown in KIS's official sample.
     return error.status_code == 401 or error.kis_code == "EGW00123"
+
+
+def fetch_analyst_consensus(stock_code: str) -> list[dict[str, Any]]:
+    """Compatibility hook for Part 1; requires KIS schema verification first."""
+
+    validate_stock_code(stock_code)
+    raise NotImplementedError(
+        "KIS analyst-consensus schema has not been live-verified; no request was sent."
+    )
+
+
+def fetch_daily_ohlcv(
+    stock_code: str, start_date: str, end_date: str
+) -> list[dict[str, Any]]:
+    """Reserved for static charts once its exact KIS historical schema is verified."""
+
+    validate_stock_code(stock_code)
+    if not start_date or not end_date:
+        raise ValueError("start_date and end_date are required")
+    raise NotImplementedError(
+        "KIS historical OHLCV schema has not been live-verified; no request was sent."
+    )
 
 
 async def _main() -> int:
