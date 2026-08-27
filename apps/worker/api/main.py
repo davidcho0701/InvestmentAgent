@@ -9,15 +9,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..core import get_logger, settings
-from ..core import cache, db
+from ..core import cache, db, get_logger, settings
 from ..ingestion.kis_client import KISSettings
 from ..streaming.chart_runtime import RealtimeChartRuntime
 from .routes_chart import router as chart_router
 from .routes_company import router as company_router
+from .routes_news import router as news_router
 from .routes_score import router as score_router
-from .routes_watchlist import router as watchlist_router
 from .routes_watchlist import register_on_add, register_on_remove
+from .routes_watchlist import router as watchlist_router
 
 log = get_logger(__name__)
 
@@ -79,6 +79,7 @@ app.include_router(score_router)
 app.include_router(watchlist_router)
 app.include_router(chart_router)
 app.include_router(company_router)
+app.include_router(news_router)
 
 
 @app.get("/health")

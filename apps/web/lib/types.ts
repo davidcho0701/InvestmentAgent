@@ -36,6 +36,32 @@ export interface AnalystConsensus {
   latest_report_date: string | null;
 }
 
+export interface NewsEvidenceItem {
+  title: string | null;
+  url: string | null;
+  published_at: string | null;
+  sentiment_score: number | null;
+  evidence: string;
+}
+
+export interface NewsEvidenceResponse {
+  stock_code: string;
+  corp_name: string | null;
+  items: NewsEvidenceItem[];
+}
+
+export interface NewsEvidenceRefreshResponse {
+  stock_code: string;
+  corp_name: string | null;
+  result: {
+    corp_code: string;
+    collected: number;
+    saved: number;
+    high_impact: number;
+    rolling_score: number;
+  };
+}
+
 export interface Candle {
   time: number; // epoch seconds
   open: number;
