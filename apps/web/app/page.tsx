@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LogoMark from "@/components/shared/LogoMark";
 
 export default function Home() {
   return (
@@ -11,10 +12,10 @@ export default function Home() {
       <header className="relative mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/15 text-accent">
-            <span className="h-2 w-2 rounded-full bg-accent" />
+            <LogoMark className="h-4 w-4" />
           </span>
           <span className="text-sm font-semibold tracking-wide text-neutral-200">
-            InvestScope
+            NewsFin Quant
           </span>
         </div>
         <Link

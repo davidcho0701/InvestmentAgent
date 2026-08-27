@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import CompanySelector from "@/components/shared/CompanySelector";
+import LogoMark from "@/components/shared/LogoMark";
 import FundamentalReport from "@/components/part1/FundamentalReport";
 import LlmNewsEvidence from "@/components/part1/LlmNewsEvidence";
 import ChartLiteracy from "@/components/part2/ChartLiteracy";
@@ -13,17 +15,23 @@ export default function DashboardPage() {
     <div className="flex h-screen flex-col bg-surface-base">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-surface-border px-4">
         <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            aria-label="홈으로 돌아가기"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-500 transition hover:bg-surface-raised hover:text-neutral-200"
+          >
+            ←
+          </Link>
           <span className="flex h-5 w-5 items-center justify-center rounded bg-accent/15 text-accent">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <LogoMark className="h-3.5 w-3.5" />
           </span>
           <span className="text-sm font-semibold tracking-wide text-neutral-100">
-            InvestScope
+            NewsFin Quant
           </span>
           <span className="ml-2 hidden text-xs text-neutral-600 sm:inline">
-            설명 가능한 투자 스코어 · 매매 신호 아님
+            설명 가능한 투자 스코어
           </span>
         </div>
-        <span className="font-mono text-[11px] tabular-nums text-neutral-600">demo-user</span>
       </header>
 
       <div className="flex min-h-0 flex-1">

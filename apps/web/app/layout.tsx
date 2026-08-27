@@ -17,7 +17,7 @@ const plexKr = IBM_Plex_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "InvestScope",
+  title: "NewsFin Quant",
   description: "재무·뉴스·거시경제 통합 투자 스코어 + 실시간 차트 해설",
 };
 

@@ -50,7 +50,7 @@ export default function ChartLiteracy({ stockCode }: { stockCode: string }) {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-neutral-50">차트 쉽게 읽기</h2>
-          <p className="mt-0.5 text-xs text-neutral-600">수치와 봉 모양을 쉬운 말로 풀이합니다.</p>
+          <p className="mt-0.5 text-xs text-neutral-600">용어 해설</p>
         </div>
         {chart?.mode === "realtime" ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-up/20 bg-up/10 px-2.5 py-1 text-[11px] font-medium text-up">
