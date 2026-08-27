@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from ..core import cache, db, get_logger, settings
@@ -226,7 +226,7 @@ def rescore_live(corp_code: str, trigger_type: str = "batch") -> dict[str, Any]:
     features = assemble_features(corp_code)
     final_score, contributing_factors = calculate_final_score(features)
     label = recommendation_label(final_score)
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
 
     db.execute(
         """
@@ -279,7 +279,7 @@ def compute_snapshot_and_cache(stock_code: str) -> dict[str, Any]:
     final_score, contributing_factors = calculate_final_score(features)
     evidence = build_evidence_sentences(contributing_factors)
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     ttl = settings.snapshot_cache_ttl_seconds
     expires_at = now + timedelta(seconds=ttl)
 

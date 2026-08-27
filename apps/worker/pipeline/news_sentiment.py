@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -112,7 +112,7 @@ def update_rolling_sentiment(corp_code: str) -> float:
 
     score = 0.0
     if rows:
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         weighted_sum = 0.0
         weight_total = 0.0
         for row in rows:
