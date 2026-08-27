@@ -55,12 +55,21 @@ cp .env.example .env
 - `KIS_APP_KEY`
 - `KIS_APP_SECRET`
 
+로컬 LLM 기본값:
+
+```bash
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen2.5:1.5b-instruct
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
 주의:
 
 - Supabase session pooler URL의 `<password>`에는 GitHub 비밀번호가 아니라 Supabase DB 비밀번호를 넣는다.
 - Upstash Redis는 TLS 접속이므로 `REDIS_URL`은 `rediss://default:<password>@<host>:6379` 형식으로 둔다.
 - Redis 비밀번호가 대화/화면에 한 번 노출됐으므로 Upstash에서 비밀번호 rotate 후 `.env`를 갱신하는 것을 권장한다.
 - API 키, DB URL, Redis URL 전체값은 문서/커밋/채팅에 남기지 않는다.
+- Anthropic 같은 외부 LLM API 대신 로컬 Ollama 를 쓰면 `LLM_API_KEY`는 비워둬도 된다.
 
 ## DB 마이그레이션
 
@@ -144,6 +153,31 @@ KIS 참고 링크:
 
 - https://github.com/koreainvestment/open-trading-api
 - https://apiportal.koreainvestment.com/intro
+
+### 로컬 LLM
+
+고영향 뉴스 근거 문장 생성은 Ollama 로컬 모델을 기본값으로 전환했다.
+
+- Provider: `ollama`
+- Model: `qwen2.5:1.5b-instruct`
+- Base URL: `http://localhost:11434`
+- 호출 API: `POST /api/generate`
+- Anthropic 사용도 가능하지만 `LLM_PROVIDER=anthropic`, `LLM_API_KEY`, `LLM_MODEL`을 명시해야 한다.
+
+동료 PC에서 필요한 준비:
+
+```bash
+brew install ollama
+ollama pull qwen2.5:1.5b-instruct
+ollama serve
+```
+
+관련 변경 파일:
+
+- `apps/worker/core/config.py`
+- `apps/worker/pipeline/news_sentiment.py`
+- `.env.example`
+- `tests/worker/test_news_sentiment_llm.py`
 
 ## 실행 방법
 
@@ -235,6 +269,7 @@ cd apps/web && npm run typecheck
 ## 현재 남은 이슈
 
 - KIS historical OHLCV 조회는 아직 stub 상태다.
+- Ollama가 설치/실행되어 있지 않으면 LLM 근거 문장 생성은 스킵된다.
 - 실시간 차트는 관심종목 등록 후 WebSocket 연결까지 확인했지만, 장 종료 후에는 새 tick이 없어서 차트 데이터가 비어 보일 수 있다.
 - “차트 쉽게 읽기”는 실시간/과거 OHLCV 캔들이 들어와야 패턴과 지표 해석이 가능하다.
 - npm install 결과 보안 취약점 경고가 3개 있었지만 아직 별도 조치하지 않았다.
@@ -246,6 +281,7 @@ cd apps/web && npm run typecheck
 2. Supabase 마이그레이션 3개가 적용됐는지 확인한다.
 3. Upstash Redis URL은 `rediss://`로 시작하는지 확인한다.
 4. `conda activate study` 후 백엔드를 실행한다.
-5. `apps/web`에서 프론트를 실행한다.
-6. `/health`가 `db=true`, `redis=true`, `missing_env=[]`인지 확인한다.
-7. `005930` 검색 후 애널리스트 컨센서스 패널이 나오는지 확인한다.
+5. Ollama를 설치하고 `qwen2.5:1.5b-instruct` 모델을 pull한다.
+6. `apps/web`에서 프론트를 실행한다.
+7. `/health`가 `db=true`, `redis=true`, `missing_env=[]`인지 확인한다.
+8. `005930` 검색 후 애널리스트 컨센서스 패널이 나오는지 확인한다.

@@ -1,4 +1,5 @@
 """환경변수 + config.yaml 로딩. 앱 전역에서 settings / scoring_config 를 import 해 사용한다."""
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -35,8 +36,10 @@ class Settings(BaseSettings):
     redis_url: str = ""
 
     # LLM
+    llm_provider: str = ""
     llm_api_key: str = ""
-    llm_model: str = "claude-haiku-4-5-20251001"
+    llm_model: str = "qwen2.5:1.5b-instruct"
+    ollama_base_url: str = "http://localhost:11434"
 
     # 앱 정책
     max_watchlist_slots: int = 3

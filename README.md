@@ -34,7 +34,8 @@ copy .env.example .env      # Windows
 cp .env.example .env        # macOS/Linux
 ```
 
-API 키 5종(DART, ECOS, 네이버, KIS, LLM)과 `DATABASE_URL`, `REDIS_URL` 을 채운다. 발급 링크는 `.env.example` 주석 참조.
+API 키 4종(DART, ECOS, 네이버, KIS)과 `DATABASE_URL`, `REDIS_URL` 을 채운다.
+고영향 뉴스 근거 생성은 기본적으로 로컬 Ollama 를 사용한다.
 
 ### 2. 백엔드 (apps/worker)
 
@@ -52,9 +53,25 @@ psql "$DATABASE_URL" -f db/migrations/0001_init.sql
 psql "$DATABASE_URL" -f db/migrations/0002_seed_sector_sensitivity.sql
 ```
 
-psql 이 없으면 Supabase 대시보드의 SQL Editor 에 두 파일 내용을 붙여넣어 실행해도 된다.
+psql 이 없으면 Supabase 대시보드의 SQL Editor 에 마이그레이션 파일 내용을 붙여넣어 실행해도 된다.
 
-### 4. 프론트엔드 (apps/web)
+### 4. 로컬 LLM (Ollama)
+
+```bash
+brew install ollama       # macOS Homebrew 사용 시
+ollama pull qwen2.5:1.5b-instruct
+ollama serve
+```
+
+`.env` 기본값:
+
+```bash
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen2.5:1.5b-instruct
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+### 5. 프론트엔드 (apps/web)
 
 ```bash
 cd apps/web
