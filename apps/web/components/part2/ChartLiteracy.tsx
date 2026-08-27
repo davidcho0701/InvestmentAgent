@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import useSWR from "swr";
 import CandleChart from "@/components/part2/CandleChart";
 import { fetcher } from "@/lib/api";
 import { useRealtimeCandles } from "@/lib/hooks/useRealtimeCandles";
+import { buildMockChart } from "@/lib/mockChart";
 import type { Candle, ChartAnnotation, ChartResponse } from "@/lib/types";
 
 const USER_ID = "demo-user";
@@ -15,8 +17,14 @@ export default function ChartLiteracy({ stockCode }: { stockCode: string }) {
     fetcher,
   );
   const live = useRealtimeCandles(stockCode, chart?.mode === "realtime");
-  const candles = mergeCandles(chart?.candles ?? [], live.candles);
-  const annotations = mergeAnnotations(chart?.annotations ?? [], live.annotations);
+  const fetchedCandles = mergeCandles(chart?.candles ?? [], live.candles);
+  const fetchedAnnotations = mergeAnnotations(chart?.annotations ?? [], live.annotations);
+
+  // 장 마감 등으로 실체결이 하나도 없을 때만 데모용 목업으로 채운다 (실데이터가 있으면 그게 우선).
+  const mock = useMemo(() => buildMockChart(stockCode), [stockCode]);
+  const usingMock = fetchedCandles.length === 0;
+  const candles = usingMock ? mock.candles : fetchedCandles;
+  const annotations = usingMock ? mock.annotations : fetchedAnnotations;
   const latest = candles.at(-1);
   const change = latest ? latest.close - latest.open : 0;
   const changePct = latest && latest.open ? (change / latest.open) * 100 : 0;
@@ -71,6 +79,11 @@ export default function ChartLiteracy({ stockCode }: { stockCode: string }) {
               {isUp ? "▲" : "▼"} {priceFmt.format(Math.abs(change))} ({changePct >= 0 ? "+" : ""}
               {changePct.toFixed(2)}%)
             </span>
+            {usingMock && (
+              <span className="ml-auto text-[11px] text-neutral-600">
+                실체결 없음 · 예시 화면
+              </span>
+            )}
           </div>
 
           <div className="mt-3 overflow-hidden rounded-lg border border-surface-border bg-surface-raised/50">
