@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-surface-border;
+  }
+
+  body {
+    font-feature-settings: "tnum" 1, "cv05" 1;
+  }
+
+  ::selection {
+    background-color: rgba(45, 212, 191, 0.25);
+    color: #ecfdf5;
+  }
+
+  /* 다크 트레이딩 터미널 느낌의 얇은 스크롤바 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #1f2530;
+    border-radius: 9999px;
+    border: 2px solid #05070a;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #2a323f;
+  }
+}

@@ -12,8 +12,11 @@ export default function ModeBadge({
 }) {
   if (mode === "live") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-medium text-red-400">
-        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-up/20 bg-up/10 px-2.5 py-1 text-[11px] font-medium text-up">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-up opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-up" />
+        </span>
         실시간
       </span>
     );
@@ -25,7 +28,7 @@ export default function ModeBadge({
   });
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-400">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[11px] font-medium text-amber-300">
       스냅샷 · {label} 기준
     </span>
   );

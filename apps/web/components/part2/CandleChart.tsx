@@ -32,25 +32,30 @@ export default function CandleChart({ candles, annotations }: Props) {
       autoSize: true,
       height: 320,
       layout: {
-        background: { type: ColorType.Solid, color: "#171717" },
-        textColor: "#d4d4d4",
+        background: { type: ColorType.Solid, color: "#0b0e13" },
+        textColor: "#8a94a3",
+        fontFamily: "var(--font-manrope), var(--font-plex-kr), ui-sans-serif, sans-serif",
       },
       grid: {
-        vertLines: { color: "#262626" },
-        horzLines: { color: "#262626" },
+        vertLines: { color: "#171c25" },
+        horzLines: { color: "#171c25" },
       },
-      rightPriceScale: { borderColor: "#404040" },
-      timeScale: { borderColor: "#404040", timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: "#1f2530" },
+      timeScale: { borderColor: "#1f2530", timeVisible: true, secondsVisible: false },
+      crosshair: {
+        vertLine: { color: "#2dd4bf40", labelBackgroundColor: "#11151c" },
+        horzLine: { color: "#2dd4bf40", labelBackgroundColor: "#11151c" },
+      },
     });
     const candleSeries = chart.addCandlestickSeries({
-      upColor: "#f87171",
-      downColor: "#60a5fa",
+      upColor: "#f43f5e",
+      downColor: "#3b82f6",
       borderVisible: false,
-      wickUpColor: "#f87171",
-      wickDownColor: "#60a5fa",
+      wickUpColor: "#f43f5e",
+      wickDownColor: "#3b82f6",
     });
     const volumeSeries = chart.addHistogramSeries({
-      color: "#737373",
+      color: "#3f4757",
       priceFormat: { type: "volume" },
       priceScaleId: "volume",
     });
@@ -88,7 +93,7 @@ export default function CandleChart({ candles, annotations }: Props) {
         (candle): HistogramData<Time> => ({
           time: candle.time as Time,
           value: candle.volume,
-          color: candle.close >= candle.open ? "#ef444480" : "#3b82f680",
+          color: candle.close >= candle.open ? "#f43f5e80" : "#3b82f680",
         }),
       ),
     );
@@ -104,5 +109,5 @@ export default function CandleChart({ candles, annotations }: Props) {
     chartRef.current?.timeScale().fitContent();
   }, [annotations, candles]);
 
-  return <div ref={containerRef} aria-label="OHLCV candlestick chart" className="mt-4 w-full" />;
+  return <div ref={containerRef} aria-label="OHLCV candlestick chart" className="w-full" />;
 }
