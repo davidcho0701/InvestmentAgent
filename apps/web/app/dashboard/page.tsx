@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CompanySelector from "@/components/shared/CompanySelector";
 import FundamentalReport from "@/components/part1/FundamentalReport";
+import LlmNewsEvidence from "@/components/part1/LlmNewsEvidence";
 import ChartLiteracy from "@/components/part2/ChartLiteracy";
 
 export default function DashboardPage() {
@@ -37,7 +38,10 @@ export default function DashboardPage() {
 
           {stockCode ? (
             <div className="grid gap-4 p-4 lg:grid-cols-2">
-              <FundamentalReport stockCode={stockCode} />
+              <div className="space-y-4">
+                <FundamentalReport stockCode={stockCode} />
+                <LlmNewsEvidence stockCode={stockCode} />
+              </div>
               <ChartLiteracy stockCode={stockCode} />
             </div>
           ) : (

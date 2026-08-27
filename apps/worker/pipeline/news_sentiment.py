@@ -1,8 +1,9 @@
 """뉴스 감성분석 (§3.2.3, Phase 2).
 
-로컬 CPU 추론(KR-FinBERT)이 기본. 고영향 기사에 한해서만 LLM 으로 근거 문장을 생성한다.
-모델은 서버 기동 시 1회만 로드한다.
+로컬 CPU 추론(KR-FinBERT)이 기본. 고영향 기사에 한해서만 선택한 LLM 으로 근거
+문장을 생성한다. 감성분석 모델은 서버 기동 시 1회만 로드한다.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,8 +21,10 @@ _pipeline = None
 
 _LABEL_SIGN = {"positive": 1, "negative": -1, "neutral": 0}
 
-_LLM_API_URL = "https://api.anthropic.com/v1/messages"
-_LLM_API_VERSION = "2023-06-01"
+_ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+_ANTHROPIC_API_VERSION = "2023-06-01"
+_OLLAMA_GENERATE_PATH = "/api/generate"
+_DEFAULT_OLLAMA_MODEL = "qwen2.5:1.5b-instruct"
 
 
 def get_sentiment_pipeline():
@@ -58,37 +61,97 @@ def is_high_impact(sentiment_score: float) -> bool:
 
 def generate_evidence_with_llm(title: str, body: str) -> str:
     """고영향 기사에 한해 LLM 으로 근거 문장 1~2줄 생성. 호출 최소화."""
-    if not settings.llm_api_key:
-        log.warning("LLM_API_KEY 미설정 — 근거 문장 생성 스킵")
-        return ""
+    provider = _llm_provider()
+    prompt = _build_evidence_prompt(title, body)
+    if provider == "ollama":
+        return _generate_evidence_with_ollama(prompt)
+    if provider == "anthropic":
+        return _generate_evidence_with_anthropic(prompt)
 
-    prompt = (
+    log.warning("지원하지 않는 LLM_PROVIDER — 근거 문장 생성 스킵", provider=provider)
+    return ""
+
+
+def _llm_provider() -> str:
+    provider = settings.llm_provider.strip().lower()
+    if provider:
+        return provider
+    return "anthropic" if settings.llm_api_key else "ollama"
+
+
+def _build_evidence_prompt(title: str, body: str) -> str:
+    return (
         "다음은 상장기업 관련 고영향 뉴스입니다. 투자자가 참고할 수 있도록 "
         "이 뉴스가 왜 중요한지 한국어 1~2문장으로 중립적으로 요약하세요. "
-        "매수/매도 권유 표현은 쓰지 마세요.\n\n"
-        f"제목: {title}\n본문: {body[:1500]}"
+        "매수/매도 권유 표현은 쓰지 마세요. 출력은 요약 문장만 작성하세요.\n\n"
+        f"제목: {title}\n본문: {body[:1000]}"
     )
+
+
+def _generate_evidence_with_anthropic(prompt: str) -> str:
+    if not settings.llm_api_key:
+        log.warning("LLM_API_KEY 미설정 — Anthropic 근거 문장 생성 스킵")
+        return ""
+
     headers = {
         "x-api-key": settings.llm_api_key,
-        "anthropic-version": _LLM_API_VERSION,
+        "anthropic-version": _ANTHROPIC_API_VERSION,
         "content-type": "application/json",
     }
     payload = {
         "model": settings.llm_model,
-        "max_tokens": 200,
+        "max_tokens": 120,
         "messages": [{"role": "user", "content": prompt}],
     }
     try:
         with httpx.Client(timeout=30.0) as client:
-            resp = client.post(_LLM_API_URL, headers=headers, json=payload)
+            resp = client.post(_ANTHROPIC_API_URL, headers=headers, json=payload)
             resp.raise_for_status()
             data = resp.json()
-    except httpx.HTTPError:
-        log.exception("LLM 근거 문장 생성 실패", title=title)
+    except httpx.HTTPError as exc:
+        log.warning(
+            "Anthropic 근거 문장 생성 실패",
+            error_type=type(exc).__name__,
+            status_code=_http_status_code(exc),
+        )
         return ""
 
     parts = data.get("content", [])
     return "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+
+
+def _generate_evidence_with_ollama(prompt: str) -> str:
+    model = settings.llm_model.strip() or _DEFAULT_OLLAMA_MODEL
+    url = f"{settings.ollama_base_url.rstrip('/')}{_OLLAMA_GENERATE_PATH}"
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.2,
+            "num_predict": 120,
+        },
+    }
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            resp = client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        log.warning(
+            "Ollama 근거 문장 생성 실패",
+            error_type=type(exc).__name__,
+            status_code=_http_status_code(exc),
+        )
+        return ""
+
+    response = data.get("response")
+    return response.strip() if isinstance(response, str) else ""
+
+
+def _http_status_code(exc: httpx.HTTPError) -> int | None:
+    response = getattr(exc, "response", None)
+    return response.status_code if response is not None else None
 
 
 def update_rolling_sentiment(corp_code: str) -> float:
@@ -112,7 +175,7 @@ def update_rolling_sentiment(corp_code: str) -> float:
 
     score = 0.0
     if rows:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)  # noqa: UP017 - study env runs Python 3.10.
         weighted_sum = 0.0
         weight_total = 0.0
         for row in rows:
