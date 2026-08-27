@@ -10,8 +10,10 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from datetime import date, datetime, timedelta
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
@@ -24,6 +26,10 @@ TOKEN_PATH = "/oauth2/tokenP"
 WEBSOCKET_APPROVAL_PATH = "/oauth2/Approval"
 CURRENT_PRICE_PATH = "/uapi/domestic-stock/v1/quotations/inquire-price"
 CURRENT_PRICE_TR_ID = "FHKST01010100"
+INVEST_OPINION_PATH = "/uapi/domestic-stock/v1/quotations/invest-opinion"
+INVEST_OPINION_TR_ID = "FHKST663300C0"
+INVEST_OPINION_SCREEN_CODE = "16633"
+DEFAULT_CONSENSUS_LOOKBACK_DAYS = 180
 TOKEN_EXPIRY_SAFETY_SECONDS = 60
 DEFAULT_TIMEOUT_SECONDS = 10.0
 
@@ -47,9 +53,7 @@ class KISAuthenticationError(KISAPIError):
     """KIS could not issue a REST token or a WebSocket approval key."""
 
 
-# Backward-compatible name used by the existing analytics pipeline.  The
-# pipeline's analyst-consensus endpoint remains deliberately unimplemented
-# until its KIS TR ID and response schema have been live-verified.
+# Backward-compatible name used by the existing analytics pipeline.
 KisApiError = KISAPIError
 
 
@@ -66,7 +70,7 @@ class KISSettings:
         return MOCK_API_BASE_URL if self.is_mock else LIVE_API_BASE_URL
 
     @classmethod
-    def from_env(cls) -> "KISSettings":
+    def from_env(cls) -> KISSettings:
         # `override=False` leaves credentials injected by a deployment intact.
         load_dotenv(override=False)
         app_key = os.getenv("KIS_APP_KEY", "").strip()
@@ -121,10 +125,10 @@ class KISClient:
         self._token_lock = asyncio.Lock()
 
     @classmethod
-    def from_env(cls) -> "KISClient":
+    def from_env(cls) -> KISClient:
         return cls(KISSettings.from_env())
 
-    async def __aenter__(self) -> "KISClient":
+    async def __aenter__(self) -> KISClient:
         return self
 
     async def __aexit__(self, *_: object) -> None:
@@ -155,9 +159,7 @@ class KISClient:
                 )
 
             expires_in = _positive_int(response.get("expires_in"), default=0)
-            expires_at = time.monotonic() + max(
-                0, expires_in - TOKEN_EXPIRY_SAFETY_SECONDS
-            )
+            expires_at = time.monotonic() + max(0, expires_in - TOKEN_EXPIRY_SAFETY_SECONDS)
             self._token = _CachedToken(value=access_token, expires_at=expires_at)
             logger.info("KIS token acquired")
             return access_token
@@ -200,6 +202,68 @@ class KISClient:
                 kis_code=_string_value(response.get("msg_cd")),
             )
         return output
+
+    async def get_analyst_consensus(
+        self,
+        stock_code: str,
+        *,
+        start_date: date | str | None = None,
+        end_date: date | str | None = None,
+        lookback_days: int = DEFAULT_CONSENSUS_LOOKBACK_DAYS,
+    ) -> list[dict[str, Any]]:
+        """Return normalized analyst investment opinions for a domestic stock."""
+
+        code = validate_stock_code(stock_code)
+        end = _query_date(end_date) if end_date is not None else date.today()
+        start = (
+            _query_date(start_date)
+            if start_date is not None
+            else end - timedelta(days=lookback_days)
+        )
+        if start > end:
+            raise ValueError("start_date must be earlier than or equal to end_date")
+
+        response = await self._authorized_request(
+            "GET",
+            INVEST_OPINION_PATH,
+            headers={"tr_id": INVEST_OPINION_TR_ID},
+            params={
+                "FID_COND_MRKT_DIV_CODE": "J",
+                "FID_COND_SCR_DIV_CODE": INVEST_OPINION_SCREEN_CODE,
+                "FID_INPUT_ISCD": code,
+                "FID_INPUT_DATE_1": _format_kis_date(start),
+                "FID_INPUT_DATE_2": _format_kis_date(end),
+            },
+        )
+
+        output = response.get("output")
+        if output in (None, ""):
+            return []
+        if isinstance(output, dict):
+            raw_rows = [output]
+        elif isinstance(output, list):
+            raw_rows = [row for row in output if isinstance(row, dict)]
+        else:
+            raise KISAPIError(
+                "KIS investment-opinion response did not include output rows",
+                kis_code=_string_value(response.get("msg_cd")),
+            )
+
+        rows: list[dict[str, Any]] = []
+        for raw in raw_rows:
+            report_date = _parse_yyyymmdd(raw.get("stck_bsop_date"))
+            if report_date is None:
+                continue
+            rows.append(
+                {
+                    "stock_code": code,
+                    "report_date": report_date,
+                    "securities_firm": _clean_text(raw.get("mbcr_name")),
+                    "opinion": _normalize_opinion(raw.get("invt_opnn")),
+                    "target_price": _numeric_or_none(raw.get("hts_goal_prc")),
+                }
+            )
+        return rows
 
     async def _authorized_request(
         self,
@@ -287,23 +351,94 @@ def _string_value(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def _clean_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _query_date(value: date | str) -> date:
+    if isinstance(value, date):
+        return value
+    parsed = _parse_yyyymmdd(value)
+    if parsed is None:
+        raise ValueError("date must be YYYYMMDD or YYYY-MM-DD")
+    return parsed
+
+
+def _format_kis_date(value: date) -> str:
+    return value.strftime("%Y%m%d")
+
+
+def _parse_yyyymmdd(value: object) -> date | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().replace("-", "")
+    if len(normalized) != 8 or not normalized.isdecimal():
+        return None
+    try:
+        return datetime.strptime(normalized, "%Y%m%d").date()
+    except ValueError:
+        return None
+
+
+def _normalize_opinion(value: object) -> str | None:
+    text = _clean_text(value)
+    if text is None:
+        return None
+
+    upper = text.upper()
+    if "매수" in text or "BUY" in upper or "OUTPERFORM" in upper:
+        return "매수"
+    if (
+        "중립" in text
+        or "보유" in text
+        or "HOLD" in upper
+        or "NEUTRAL" in upper
+        or "MARKETPERFORM" in upper
+    ):
+        return "중립"
+    if "매도" in text or "SELL" in upper or "REDUCE" in upper or "UNDERPERFORM" in upper:
+        return "매도"
+    return text
+
+
+def _numeric_or_none(value: object) -> float | int | None:
+    if value is None:
+        return None
+    normalized = str(value).strip().replace(",", "")
+    if not normalized or normalized in {"-", "0"}:
+        return None
+    try:
+        number = float(normalized)
+    except ValueError:
+        return None
+    if number == 0:
+        return None
+    return int(number) if number.is_integer() else number
+
+
 def _is_expired_token_error(error: KISAPIError) -> bool:
     # EGW00123 is the token-expiry code shown in KIS's official sample.
     return error.status_code == 401 or error.kis_code == "EGW00123"
 
 
-def fetch_analyst_consensus(stock_code: str) -> list[dict[str, Any]]:
-    """Compatibility hook for Part 1; requires KIS schema verification first."""
-
-    validate_stock_code(stock_code)
-    raise NotImplementedError(
-        "KIS analyst-consensus schema has not been live-verified; no request was sent."
-    )
-
-
-def fetch_daily_ohlcv(
-    stock_code: str, start_date: str, end_date: str
+def fetch_analyst_consensus(
+    stock_code: str,
+    *,
+    lookback_days: int = DEFAULT_CONSENSUS_LOOKBACK_DAYS,
 ) -> list[dict[str, Any]]:
+    """Compatibility hook for Part 1's synchronous consensus pipeline."""
+
+    async def _run() -> list[dict[str, Any]]:
+        async with KISClient.from_env() as client:
+            return await client.get_analyst_consensus(stock_code, lookback_days=lookback_days)
+
+    return asyncio.run(_run())
+
+
+def fetch_daily_ohlcv(stock_code: str, start_date: str, end_date: str) -> list[dict[str, Any]]:
     """Reserved for static charts once its exact KIS historical schema is verified."""
 
     validate_stock_code(stock_code)

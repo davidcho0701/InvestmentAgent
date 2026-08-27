@@ -2,6 +2,7 @@
 
 제약(§7): 이 값은 final_score 연산에 절대 섞지 않고, 별도 패널로만 노출한다.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -17,8 +18,21 @@ def sync_consensus(stock_code: str) -> int:
 
     try:
         rows = kis_client.fetch_analyst_consensus(stock_code)
+    except kis_client.KISAPIError as exc:
+        log.warning(
+            "KIS 투자의견 조회 실패",
+            stock_code=stock_code,
+            error_type=type(exc).__name__,
+            status_code=exc.status_code,
+            kis_code=exc.kis_code,
+        )
+        return 0
     except Exception:
-        log.exception("KIS 투자의견 조회 실패", stock_code=stock_code)
+        log.warning(
+            "KIS 투자의견 조회 실패",
+            stock_code=stock_code,
+            error_type="unexpected",
+        )
         return 0
     if not rows:
         return 0
@@ -37,16 +51,17 @@ def sync_consensus(stock_code: str) -> int:
     if not payload:
         return 0
 
-    db.execute(
+    inserted = db.execute(
         """
         INSERT INTO fact_analyst_consensus
             (stock_code, report_date, securities_firm, opinion, target_price)
         VALUES
             (:stock_code, :report_date, :securities_firm, :opinion, :target_price)
+        ON CONFLICT DO NOTHING
         """,
         payload,
     )
-    return len(payload)
+    return inserted
 
 
 def summarize_consensus(stock_code: str, days: int = 90) -> dict[str, Any]:
